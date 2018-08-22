@@ -1,10 +1,10 @@
 ﻿using Gamedev.Assets;
-using Gamedev.Assets.Players;
+using Gamedev.Assets.Levels;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Unity;
+using MonoGame.Extended;
+using MonoGame.Extended.ViewportAdapters;
 
 namespace Gamedev
 {
@@ -13,71 +13,77 @@ namespace Gamedev
     {
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
-        Player player;
-        
-        
+        Level level1;
+        Camera2D camera;
+
+
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             graphics.PreferredBackBufferHeight = 1080;
             graphics.PreferredBackBufferWidth = 1920;
-          //  graphics.IsFullScreen = true;
-
+            graphics.GraphicsProfile = GraphicsProfile.HiDef;
+            
         }
 
         protected override void Initialize()
         {
+            level1 = new Level(Content, GraphicsDevice, 0);
             base.Initialize();
+            var viewportAdapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1920, 1080);
+            camera = new Camera2D(viewportAdapter);
+
         }
 
-        /// <summary>
-        /// LoadContent will be called once per game and is the place to load
-        /// all of your content.
-        /// </summary>
+
         protected override void LoadContent()
         {
-            // Create a new SpriteBatch, which can be used to draw textures.
+
             spriteBatch = new SpriteBatch(GraphicsDevice);
-            player = new Player(Content);
+            
             
         }
 
-        /// <summary>
-        /// UnloadContent will be called once per game and is the place to unload
-        /// game-specific content.
-        /// </summary>
-        protected override void UnloadContent()
-        {
-            // TODO: Unload any non ContentManager content here
-        }
 
-        /// <summary>
-        /// Allows the game to run logic such as updating the world,
-        /// checking for collisions, gathering input, and playing audio.
-        /// </summary>
-        /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
+            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+            {
                 Exit();
 
-            player.Update(gameTime);
-
+            }
+            
+            level1.Update(gameTime);
+            
             base.Update(gameTime);
         }
 
-        /// <summary>
-        /// This is called when the game should draw itself.
-        /// </summary>
-        /// <param name="gameTime">Provides a snapshot of timing values.</param>
+   
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
+            var transformMatrix = camera.GetViewMatrix();
+            spriteBatch.Begin(transformMatrix: transformMatrix);
+            FollowPlayer(level1, camera);
+            level1.Draw(gameTime, spriteBatch);
 
-            player.Draw(gameTime, spriteBatch);
-
+            spriteBatch.End();
             base.Draw(gameTime);
+        }
+
+        private void FollowPlayer(Level level, Camera2D camera)
+        {
+            Vector2 playerPosition = level1.GetPlayer().Position;
+            
+            if(playerPosition.X >  1080 && playerPosition.X < 11800)
+            {
+                
+                camera.Position = new Vector2(playerPosition.X - 1080, 0);
+
+            }
+           
+            
         }
     }
 }
