@@ -16,7 +16,7 @@ namespace Gamedev.Assets.Levels
     //inspiratie: https://github.com/kg/PlatformerStarterKit/blob/master/Level.cs
     public class Level
     {
-        private const bool isDebug = true;
+        private const bool isDebug = false;
         private GraphicsDevice graphicsDevice;
         private ContentManager contentManager;
         private Tile[,] tiles;
@@ -53,19 +53,15 @@ namespace Gamedev.Assets.Levels
             get { return tiles.GetLength(1); }
         }
 
-        public Level(ContentManager contentManager, GraphicsDevice graphicsDevice, int levelId)
+        public Level(ContentManager contentManager, GraphicsDevice graphicsDevice, int levelId, Score score)
         {
             this.contentManager = contentManager;
             this.graphicsDevice = graphicsDevice;
             this.levelId = levelId;
-
+            this.score = score;
             LoadContent();
             LoadBackground(levelId);
             LoadTiles(levelId);
-
-            score = new Score(contentManager);
-            
-
 
         }
 
@@ -146,7 +142,7 @@ namespace Gamedev.Assets.Levels
 
                 // Floating platform
                 case '-':
-                    return LoadTile("platform", TileCollision.Platform);
+                    return LoadInvisibleTile(TileCollision.Platform);
 
                 // Player 1 start point
                 case '1':
@@ -163,14 +159,20 @@ namespace Gamedev.Assets.Levels
                 throw new NotSupportedException("A level may only have one starting point.");
 
             start = RectangleExtensions.GetBottomCenter(GetBounds(x, y));
-            player = new Player(this, start, contentManager, 100);
+            player = new Player(this, start, contentManager, 5, score);
 
             return  LoadTile("start", TileCollision.Passable);
         }
 
         private Tile LoadInvisibleTile( TileCollision collision)
         {
+            if (isDebug)
+            {
+                return new Tile(contentManager.Load<Texture2D>("Tiles/debuginvisibleplatform"), collision);
+
+            }
             return new Tile(contentManager.Load<Texture2D>("Tiles/invisibleplatform"), collision);
+
         }
 
         private Tile LoadTile(string name, TileCollision collision)
@@ -259,7 +261,6 @@ namespace Gamedev.Assets.Levels
                 player.Update(gameTime);
 
                 UpdateCoins(gameTime);
-                score.Update(gameTime);
 
                 // Falling off the bottom of the level kills the player.
                 if (player.BoundingRectangle.Top >= Height * Tile.Height)
@@ -311,7 +312,7 @@ namespace Gamedev.Assets.Levels
 
         private void OnCoinCollected(Coin coin, Player collectedBy)
         {
-            
+            collectedBy.score._Score += coin.GetCoinValue();
         }
 
 
@@ -334,7 +335,6 @@ namespace Gamedev.Assets.Levels
 
             //   for (int i = EntityLayer + 1; i < layers.Length; ++i)
             //  spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);
-            score.Draw(gameTime, spriteBatch);
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 ﻿using Gamedev.Assets;
 using Gamedev.Assets.Levels;
+using Gamedev.Assets.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -11,11 +12,12 @@ namespace Gamedev
 
     public class Game1 : Game
     {
-        GraphicsDeviceManager graphics;
-        SpriteBatch spriteBatch;
-        Level level1;
-        Camera2D camera;
-
+        private GraphicsDeviceManager graphics;
+        private SpriteBatch spriteBatch;
+        private Level level1;
+        private Camera2D camera;
+        private Score score;
+        private HealthUI healthUI;
 
         public Game1()
         {
@@ -24,15 +26,18 @@ namespace Gamedev
             graphics.PreferredBackBufferHeight = 1080;
             graphics.PreferredBackBufferWidth = 1920;
             graphics.GraphicsProfile = GraphicsProfile.HiDef;
+
             
         }
 
         protected override void Initialize()
         {
-            level1 = new Level(Content, GraphicsDevice, 0);
             base.Initialize();
             var viewportAdapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1920, 1080);
             camera = new Camera2D(viewportAdapter);
+            score = new Score(Content, camera);
+            healthUI = new HealthUI(Content, camera);
+            level1 = new Level(Content, GraphicsDevice, 0, score);
 
         }
 
@@ -41,8 +46,8 @@ namespace Gamedev
         {
 
             spriteBatch = new SpriteBatch(GraphicsDevice);
-            
-            
+
+
         }
 
 
@@ -54,8 +59,9 @@ namespace Gamedev
 
             }
             
-            level1.Update(gameTime);
             
+            level1.Update(gameTime);
+            healthUI.Update(gameTime, level1.GetPlayer().Lives);
             base.Update(gameTime);
         }
 
@@ -67,7 +73,8 @@ namespace Gamedev
             spriteBatch.Begin(transformMatrix: transformMatrix);
             FollowPlayer(level1, camera);
             level1.Draw(gameTime, spriteBatch);
-
+            score.Draw(gameTime, spriteBatch);
+            healthUI.Draw(gameTime, spriteBatch);
             spriteBatch.End();
             base.Draw(gameTime);
         }

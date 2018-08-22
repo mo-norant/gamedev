@@ -16,30 +16,23 @@ namespace Gamedev.Assets.Players
         public const int PointValue = 30;
         public readonly Color Color = Color.Yellow;
 
-        // The coin is animated from a base position along the Y axis.
-        private Vector2 basePosition;
+        private Vector2 position;
         private float bounce;
-
-        public Level Level
-        {
-            get { return level; }
-        }
-        Level level;
-
-        /// <summary>
-        /// Gets the current position of this coin in world space.
-        /// </summary>
+        private int randomCoinValue;
+        private Level level;
         public Vector2 Position
         {
             get
             {
-                return basePosition + new Vector2(0.0f, bounce);
+                return position + new Vector2(0.0f, bounce);
             }
         }
 
-        /// <summary>
-        /// Gets a circle which bounds this coin in world space.
-        /// </summary>
+        public int GetCoinValue()
+        {
+            return randomCoinValue;
+        }
+
         public Circle BoundingCircle
         {
             get
@@ -54,14 +47,18 @@ namespace Gamedev.Assets.Players
         public Coin(Level level, Vector2 position, ContentManager contentManager)
         {
             this.level = level;
-            this.basePosition = position;
+            this.position = position;
             this.contentManager = contentManager;
+            randomCoinValue = RandomCoinValue();
             LoadContent();
         }
 
-        /// <summary>
-        /// Loads the coin texture and collected sound.
-        /// </summary>
+        private int RandomCoinValue()
+        {
+            Random r = new Random();
+            return r.Next(1, 20)*1000;
+        }
+       
         public void LoadContent()
         {
             texture = contentManager.Load<Texture2D>("Other/coin");

@@ -42,13 +42,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Assets\AnimationPlayer.cs" />
+    <Compile Include="Assets\Entitities\BulletBase.cs" />
     <Compile Include="Assets\Entitities\Enemy.cs" />
+    <Compile Include="Assets\Entitities\MainBullet.cs" />
     <Compile Include="Assets\Helpers\Animation.cs" />
     <Compile Include="Assets\Helpers\Circle.cs" />
     <Compile Include="Assets\Helpers\RectangleExtensions.cs" />
     <Compile Include="Assets\Levels\Level.cs" />
     <Compile Include="Assets\Levels\Tile.cs" />
     <Compile Include="Assets\Entitities\Coin.cs" />
+    <Compile Include="Assets\UI\HealthUI.cs" />
     <Compile Include="Assets\UI\Score.cs" />
     <Compile Include="Game1.cs" />
     <Compile Include="Assets\Entitities\Player.cs" />
@@ -132,9 +135,6 @@
     <Content Include="Content\Player\spritegeneratorsource.png" />
     <Content Include="Content\Player\walking.png" />
     <Content Include="Content\Tiles\exit.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Content\Tiles\platform.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Content\Tiles\start.png">

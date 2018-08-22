@@ -10,15 +10,14 @@ using System.Threading.Tasks;
 
 namespace Gamedev.Assets.UI
 {
-    public class Score
+    public class HealthUI
     {
         private ContentManager contentManager;
-        private SpriteFont scoreFont;
         private Camera2D camera;
-        public int _Score { get; set; }
+        private int lives;
+        private Texture2D heartTexture;
 
-
-        public Score(ContentManager contentManager, Camera2D camera)
+        public HealthUI(ContentManager contentManager, Camera2D camera)
         {
             this.contentManager = contentManager;
             this.camera = camera;
@@ -27,24 +26,29 @@ namespace Gamedev.Assets.UI
 
         private void LoadContent()
         {
-            scoreFont = contentManager.Load<SpriteFont>("Fonts/Gameplay");
+            heartTexture = contentManager.Load<Texture2D>("Other/heart");
         }
 
-        public void Update(GameTime gameTime)
+        public void Update(GameTime gameTime, int updatetLives)
         {
-            
+            lives = updatetLives;
         }
 
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
             Vector2 p = camera.Position;
+            const int SPACINGX = 60;
+            //init spacing
 
-            //Spacing
+            p += new Vector2(300, 100);
 
-            p += new Vector2(50, 100);
-            
-            spriteBatch.DrawString(scoreFont, $"Score: {_Score.ToString()}", p, Color.Red, 0f, Vector2.Zero, 2f, SpriteEffects.None, 0f);
+            for (int i = 0; i < lives; i++)
+            {
+                p += new Vector2(SPACINGX , 0);
+                spriteBatch.Draw(heartTexture, p, Color.White);
+            }
 
         }
+
     }
 }
