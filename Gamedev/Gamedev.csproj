@@ -41,18 +41,27 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Assets\AnimationPlayer.cs" />
-    <Compile Include="Assets\Entitities\BulletBase.cs" />
-    <Compile Include="Assets\Entitities\Enemy.cs" />
-    <Compile Include="Assets\Entitities\MainBullet.cs" />
-    <Compile Include="Assets\Helpers\Animation.cs" />
+    <Compile Include="Assets\Entitities\Bullets\TrumpBullet.cs" />
+    <Compile Include="Assets\Entitities\Enemies\EnemyBase.cs" />
+    <Compile Include="Assets\Entitities\Enemies\TrumpEnemy.cs" />
+    <Compile Include="Assets\Entitities\IPlayerBullet.cs" />
+    <Compile Include="Assets\Entitities\Specials\Life.cs" />
+    <Compile Include="Assets\Entitities\Specials\SpecialItemBase.cs" />
+    <Compile Include="Assets\Helpers\AnimatedSprite.cs" />
+    <Compile Include="Assets\Entitities\Bullets\BulletBase.cs" />
+    <Compile Include="Assets\Entitities\Enemies\Enemy.cs" />
+    <Compile Include="Assets\Entitities\Bullets\MainBullet.cs" />
     <Compile Include="Assets\Helpers\Circle.cs" />
+    <Compile Include="Assets\Helpers\IDebugble.cs" />
+    <Compile Include="Assets\Helpers\IPipelineBase.cs" />
     <Compile Include="Assets\Helpers\RectangleExtensions.cs" />
     <Compile Include="Assets\Levels\Level.cs" />
     <Compile Include="Assets\Levels\Tile.cs" />
-    <Compile Include="Assets\Entitities\Coin.cs" />
+    <Compile Include="Assets\Entitities\Specials\Coin.cs" />
+    <Compile Include="Assets\UI\FirePowerUI.cs" />
     <Compile Include="Assets\UI\HealthUI.cs" />
-    <Compile Include="Assets\UI\Score.cs" />
+    <Compile Include="Assets\UI\IntroSeq.cs" />
+    <Compile Include="Assets\UI\ScoreUI.cs" />
     <Compile Include="Game1.cs" />
     <Compile Include="Assets\Entitities\Player.cs" />
     <Compile Include="Program.cs" />

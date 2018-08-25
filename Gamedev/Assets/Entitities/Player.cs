@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gamedev.Assets.Entitities;
+using Gamedev.Assets.Entitities.Enemies;
 using Gamedev.Assets.Helpers;
 using Gamedev.Assets.Levels;
 using Gamedev.Assets.UI;
@@ -17,7 +18,7 @@ namespace Gamedev.Assets
 
     public enum State
     {
-        STANDING, SHOOTING, RUNNING, JUMPING
+        STANDING, SHOOTING, RUNNING, JUMPING, TELEPORTING, DIE
     }
 
     public enum Direction
@@ -30,34 +31,39 @@ namespace Gamedev.Assets
         MAIN = 20, GRENADE = 100
     }
 
-    public class Player
+    public class Player : IPipelineBase
     {
 
-        private Animation idleAnimation;
-        private Animation runAnimation;
-        private Animation jumpAnimation;
-        private Animation celebrateAnimation;
-        private Animation dieAnimation;
+
+
+        private AnimatedSprite newIdleAnimation, newRunAnimation, newJumpAnimation, newTeleportingAnimation;
+
         private SpriteEffects flip = SpriteEffects.None;
-        private AnimationPlayer sprite;
         private Direction direction;
         private State state;
-        private List<BulletBase> bullets = new List<BulletBase>();
-        public Score score { get; set; }
+        private GraphicsDevice graphicsDevice;
+        public List<MainBullet> Bullets { get; set; }
+        public ScoreUI score { get; set; }
         private ContentManager contentManager;
+        public int FirePower { get; set; }
+        private const int FirePowerInitWait = 800;
+
+
+        private const float MoveAcceleration = 80000.0f;
+        private const float MaxMoveSpeed = 2000.0f;
+        private const float GroundDragFactor = 0.58f;
+        private const float AirDragFactor = 0.65f;
+        private const float MaxJumpTime = 1f;
+        private const float JumpLaunchVelocity = -4000.0f;
+        private const float GravityAcceleration = 3500.0f;
+        private const float MaxFallSpeed = 1000.0f;
+        private const float JumpControlPower = 0.14f;
         public int Lives { get; set; }
 
-        public Level Level
-        {
-            get { return level; }
-        }
-        Level level;
+        public Level Level { get; set; }
 
-        public bool IsAlive
-        {
-            get { return isAlive; }
-        }
-        bool isAlive;
+        public bool IsAlive { get; set; }
+        
 
         // Physics state
         public Vector2 Position
@@ -74,24 +80,12 @@ namespace Gamedev.Assets
             get { return velocity; }
             set { velocity = value; }
         }
+
         Vector2 velocity;
 
 
-        private const float MoveAcceleration = 12000.0f;
-        private const float MaxMoveSpeed = 2000.0f;
-        private const float GroundDragFactor = 0.58f;
-        private const float AirDragFactor = 0.65f;
 
-        // Constants for controlling vertical movement
-        private const float MaxJumpTime = 1f;
-        private const float JumpLaunchVelocity = -4000.0f;
-        private const float GravityAcceleration = 3500.0f;
-        private const float MaxFallSpeed = 1000.0f;
-        private const float JumpControlPower = 0.14f;
 
-        // Input configuration
-        private const float MoveStickScale = 1.0f;
-        private const Buttons JumpButton = Buttons.A;
 
         /// <summary>
         /// Gets whether or not the player's feet are on the ground.
@@ -121,8 +115,8 @@ namespace Gamedev.Assets
         {
             get
             {
-                int left = (int)Math.Round(Position.X - sprite.Origin.X) + localBounds.X;
-                int top = (int)Math.Round(Position.Y - sprite.Origin.Y) + localBounds.Y;
+                int left = (int)Math.Round(Position.X - newIdleAnimation.Origin.X) + localBounds.X;
+                int top = (int)Math.Round(Position.Y - newIdleAnimation.Origin.Y) + localBounds.Y;
 
                 return new Rectangle(left, top, localBounds.Width, localBounds.Height);
             }
@@ -131,12 +125,15 @@ namespace Gamedev.Assets
         /// <summary>
         /// Constructors a new player.
         /// </summary>
-        public Player(Level level, Vector2 position, ContentManager contentManager, int Lives, Score score)
+        public Player(Level level, Vector2 position, ContentManager contentManager, int Lives, ScoreUI score, GraphicsDevice graphicsDevice)
         {
-            this.level = level;
+            Level = level;
             this.contentManager = contentManager;
             this.Lives = Lives;
             this.score = score;
+            Bullets = new List<MainBullet>();
+
+            FirePower = 1;
 
             //TESTING:
 
@@ -150,16 +147,20 @@ namespace Gamedev.Assets
         /// </summary>
         public void LoadContent()
         {
-            idleAnimation = new Animation(contentManager.Load<Texture2D>("Player/idle"), 0.1f, true);
-            runAnimation = new Animation(contentManager.Load<Texture2D>("Player/Run"), 0.1f, true);
-            jumpAnimation = new Animation(contentManager.Load<Texture2D>("Player/jumping"), 0.1f, false);
-            celebrateAnimation = new Animation(contentManager.Load<Texture2D>("Player/celebrating"), 0.1f, false);
-            dieAnimation = new Animation(contentManager.Load<Texture2D>("Player/die"), 0.1f, false);
+       
 
-            int width = (int)(idleAnimation.FrameWidth * 0.4);
-            int left = (idleAnimation.FrameWidth - width) / 2;
-            int height = (int)(idleAnimation.FrameWidth * 0.8);
-            int top = idleAnimation.FrameHeight - height;
+            newIdleAnimation = new AnimatedSprite(contentManager.Load<Texture2D>("Player/idle"), 1, 3, true);
+            newRunAnimation = new AnimatedSprite(contentManager.Load<Texture2D>("Player/Run"), 1, 9, true);
+            newJumpAnimation = new AnimatedSprite(contentManager.Load<Texture2D>("Player/jumping"), 1, 9, false);
+            newTeleportingAnimation = new AnimatedSprite(contentManager.Load<Texture2D>("Player/teleport"), 1, 9, false);
+            localBounds = new Rectangle();
+
+
+
+            int width = (int)(newIdleAnimation.FrameWidth * 0.4);
+            int left = (newIdleAnimation.FrameWidth - width) / 2;
+            int height = (int)(newIdleAnimation.FrameWidth * 0.8);
+            int top = newIdleAnimation.FrameHeight - height;
             localBounds = new Rectangle(left, top, width, height);
 
         }
@@ -168,8 +169,8 @@ namespace Gamedev.Assets
         {
             Position = position;
             Velocity = Vector2.Zero;
-            isAlive = true;
-            sprite.PlayAnimation(idleAnimation);
+            IsAlive = true;
+            state = State.STANDING;
         }
 
         public void Update(GameTime gameTime)
@@ -177,29 +178,31 @@ namespace Gamedev.Assets
             GetInput(gameTime);
             ApplyPhysics(gameTime);
             RemoveOutOfBoundBullets();
-            foreach (var b in bullets)
+            foreach (var b in Bullets)
             {
                 b.Update(gameTime);
+                
             }
+
+
+           
 
             if (IsAlive && IsOnGround)
             {
                 if (Math.Abs(Velocity.X) - 0.02f > 0)
                 {
                     state = State.RUNNING;
-                    sprite.PlayAnimation(runAnimation);
                 }
                 else
                 {
                     state = State.STANDING;
-                    sprite.PlayAnimation(idleAnimation);
                 }
             }
 
             if (isFalledOf())
             {
-                isAlive = false;
-                sprite.PlayAnimation(dieAnimation);
+                IsAlive = false;
+                state = State.DIE;
             }
 
             // Clear input.
@@ -212,7 +215,7 @@ namespace Gamedev.Assets
 
             if (Position.Y > 2000)
             {
-                Console.WriteLine("dead");
+                IsAlive = false;
                 return true;
             }
             return false;
@@ -261,21 +264,14 @@ namespace Gamedev.Assets
                 keyboardState.IsKeyDown(Keys.Up) ||
                 keyboardState.IsKeyDown(Keys.W);
             }
-
-
-
-
-
-
-
-
+            
         }
 
         private void RemoveOutOfBoundBullets()
         {
             //verwijder alle kogels die x absoluut van initpos verwijderd zijn per richting
-            bullets.RemoveAll(i => i.InitPosition.X + 1920 < i.Position.X);
-            bullets.RemoveAll(i => i.InitPosition.X - 1920 > i.Position.X);
+            Bullets.RemoveAll(i => i.InitPosition.X + 1920 < i.Position.X);
+            Bullets.RemoveAll(i => i.InitPosition.X - 1920 > i.Position.X);
         }
 
         public void ApplyPhysics(GameTime gameTime)
@@ -284,18 +280,18 @@ namespace Gamedev.Assets
 
             Vector2 previousPosition = Position;
             velocity.X += movement * MoveAcceleration * elapsed;
-            velocity.Y = MathHelper.Clamp(velocity.Y + GravityAcceleration * elapsed, -MaxFallSpeed, MaxFallSpeed);
+            velocity.Y = MathHelper.Clamp(Velocity.Y + GravityAcceleration * elapsed, -MaxFallSpeed, MaxFallSpeed);
 
-            velocity.Y = DoJump(velocity.Y, gameTime);
+            velocity.Y = DoJump(Velocity.Y, gameTime);
 
             if (IsOnGround)
                 velocity.X *= GroundDragFactor;
             else
                 velocity.X *= AirDragFactor;
 
-            velocity.X = MathHelper.Clamp(velocity.X, -MaxMoveSpeed, MaxMoveSpeed);
+            velocity.X = MathHelper.Clamp(Velocity.X, -MaxMoveSpeed, MaxMoveSpeed);
 
-            Position += velocity * elapsed;
+            Position += Velocity * elapsed;
             Position = new Vector2((float)Math.Round(Position.X), (float)Math.Round(Position.Y));
 
             HandleCollisions();
@@ -310,12 +306,14 @@ namespace Gamedev.Assets
         private TimeSpan timeprev;
         private void Shoot(BulletKind bulletKind, GameTime gameTime)
         {
-            if(gameTime.TotalGameTime > timeprev + TimeSpan.FromMilliseconds(200))
+            if(gameTime.TotalGameTime > timeprev + TimeSpan.FromMilliseconds(FirePowerInitWait / FirePower))
             {
                 if (bulletKind == BulletKind.MAIN)
                 {
-                    MainBullet bullet = new MainBullet(Position, (int)BulletKind.MAIN, contentManager, direction);
-                    bullets.Add(bullet);
+                    MainBullet bullet = new MainBullet(Position, (int)BulletKind.MAIN, contentManager, direction, graphicsDevice);
+                    Bullets.Add(bullet);
+                    
+                    bullet.ShotSound.Play();
 
                 }
                 timeprev = gameTime.TotalGameTime;
@@ -335,7 +333,6 @@ namespace Gamedev.Assets
                 {
                     state = State.JUMPING;
                     jumpTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
-                    sprite.PlayAnimation(jumpAnimation);
                 }
 
                 // If we are in the ascent of the jump
@@ -419,8 +416,8 @@ namespace Gamedev.Assets
 
         public void OnKilled(Enemy killedBy)
         {
-            isAlive = false;
-            sprite.PlayAnimation(dieAnimation);
+            IsAlive = false;
+            state = State.DIE;
         }
 
         /// <summary>
@@ -428,13 +425,13 @@ namespace Gamedev.Assets
         /// </summary>
         public void OnReachedExit()
         {
-            sprite.PlayAnimation(celebrateAnimation);
+            state = State.TELEPORTING;
         }
 
         /// <summary>
         /// Draws the animated player.
         /// </summary>
-        public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
+        public void Draw(SpriteBatch spriteBatch)
         {
             // Flip the sprite to face the way we are moving.
             if (Velocity.X > 0)
@@ -442,15 +439,37 @@ namespace Gamedev.Assets
             else if (Velocity.X < 0)
                 flip = SpriteEffects.None;
 
-            // Draw that sprite.
-            sprite.Draw(gameTime, spriteBatch, Position, flip);
             Console.WriteLine("Position: " + Position.ToString());
 
-            foreach (var bullet in bullets)
+            if(state == State.RUNNING)
+            {
+                newRunAnimation.Draw(spriteBatch, Position, flip);
+            }
+            else if(state == State.JUMPING)
+            {
+                newJumpAnimation.Draw(spriteBatch, Position, flip);
+            }
+            else if(state == State.TELEPORTING)
+            {
+                newTeleportingAnimation.Draw(spriteBatch, Position, flip);
+
+            }
+            else
+            {
+                newIdleAnimation.Draw(spriteBatch, Position, flip);
+
+            }
+
+            foreach (var bullet in Bullets)
             {
                 bullet.Draw(spriteBatch);
             }
 
+        }
+
+        public void LoadContent(ContentManager contentManager)
+        {
+            throw new NotImplementedException();
         }
     }
 }

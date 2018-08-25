@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Gamedev.Assets.Entitities;
+using Gamedev.Assets.Entitities.Enemies;
 using Gamedev.Assets.Helpers;
 using Gamedev.Assets.Players;
 using Gamedev.Assets.UI;
@@ -14,27 +15,30 @@ namespace Gamedev.Assets.Levels
 {
 
     //inspiratie: https://github.com/kg/PlatformerStarterKit/blob/master/Level.cs
-    public class Level
+    public class Level : IPipelineBase
     {
-        private const bool isDebug = false;
+        private const bool isDebug = true;
         private GraphicsDevice graphicsDevice;
         private ContentManager contentManager;
         private Tile[,] tiles;
         private List<Coin> coins = new List<Coin>();
-        private List<Enemy> enemies = new List<Enemy>();
+       
+        public List<EnemyBase> enemies { get; set; }
         private List<Texture2D> backgrounds = new List<Texture2D>();
         private const int EntityLayer = 2;
-        private Player player;
-        private Score score;
+        public Player Player { get; set; }
+        private ScoreUI score;
         private Point startPoints;
         private int levelId;
         private Point exit = InvalidPosition;
         private Vector2 start;
         private SpriteFont debugfont, mainfont;
+        private const float delay = 3;
+        private float remainingDelay = delay;
 
         public Player GetPlayer()
         {
-            return player;
+            return Player;
         }
 
         public bool ReachedExit
@@ -53,19 +57,19 @@ namespace Gamedev.Assets.Levels
             get { return tiles.GetLength(1); }
         }
 
-        public Level(ContentManager contentManager, GraphicsDevice graphicsDevice, int levelId, Score score)
+        public Level(ContentManager contentManager, GraphicsDevice graphicsDevice, int levelId, ScoreUI score)
         {
             this.contentManager = contentManager;
             this.graphicsDevice = graphicsDevice;
             this.levelId = levelId;
             this.score = score;
-            LoadContent();
+            enemies = new List<EnemyBase>();
+            LoadContent(contentManager);
             LoadBackground(levelId);
             LoadTiles(levelId);
-
         }
 
-        
+
 
         private void LoadBackground(int levelId)
         {
@@ -114,7 +118,7 @@ namespace Gamedev.Assets.Levels
             }
 
             // Verify that the level has a beginning and an end.
-            if (player == null)
+            if (Player == null)
                 throw new NotSupportedException("A level must have a starting point.");
             if (exit == InvalidPosition)
                 throw new NotSupportedException("A level must have an exit.");
@@ -128,6 +132,8 @@ namespace Gamedev.Assets.Levels
                 // Blank space
                 case '.':
                     return new Tile(null, TileCollision.Passable);
+                case 't':
+                    return LoadTrumpEnemyTile(x, y);
 
                 // Exit
                 case 'b':
@@ -147,7 +153,7 @@ namespace Gamedev.Assets.Levels
                 // Player 1 start point
                 case '1':
                     return LoadStartTile(x, y);
-                    
+
                 default:
                     throw new NotSupportedException(String.Format("Unsupported tile type character '{0}' at position {1}, {2}.", tileType, x, y));
             }
@@ -155,16 +161,16 @@ namespace Gamedev.Assets.Levels
 
         private Tile LoadStartTile(int x, int y)
         {
-            if (player != null)
+            if (Player != null)
                 throw new NotSupportedException("A level may only have one starting point.");
 
             start = RectangleExtensions.GetBottomCenter(GetBounds(x, y));
-            player = new Player(this, start, contentManager, 5, score);
+            Player = new Player(this, start, contentManager, 5, score, graphicsDevice);
 
-            return  LoadTile("start", TileCollision.Passable);
+            return LoadTile("start", TileCollision.Passable);
         }
 
-        private Tile LoadInvisibleTile( TileCollision collision)
+        private Tile LoadInvisibleTile(TileCollision collision)
         {
             if (isDebug)
             {
@@ -196,10 +202,10 @@ namespace Gamedev.Assets.Levels
         /// <summary>
         /// Instantiates an enemy and puts him in the level.
         /// </summary>
-        private Tile LoadEnemyTile(int x, int y, string spriteSet)
+        private Tile LoadTrumpEnemyTile(int x, int y)
         {
             Vector2 position = RectangleExtensions.GetBottomCenter(GetBounds(x, y));
-            enemies.Add(new Enemy(this, position, spriteSet, contentManager));
+            enemies.Add(new TrumpEnemy(graphicsDevice, this, position, contentManager, 100, Player, isDebug));
 
             return new Tile(null, TileCollision.Passable);
         }
@@ -234,7 +240,7 @@ namespace Gamedev.Assets.Levels
 
 
 
-        private void LoadContent()
+        public void LoadContent(ContentManager contentManager)
         {
             if (isDebug)
             {
@@ -246,49 +252,97 @@ namespace Gamedev.Assets.Levels
         public void Update(GameTime gameTime)
         {
             // Pause while the player is dead or time is expired.
-            if (!player.IsAlive)
+            if (!Player.IsAlive)
             {
                 // Still want to perform physics on the player.
-                player.ApplyPhysics(gameTime);
+                Player.ApplyPhysics(gameTime);
             }
             else if (ReachedExit)
             {
-                
+
             }
             else
             {
 
-                player.Update(gameTime);
+                Player.Update(gameTime);
 
                 UpdateCoins(gameTime);
 
                 // Falling off the bottom of the level kills the player.
-                if (player.BoundingRectangle.Top >= Height * Tile.Height)
+                if (Player.BoundingRectangle.Top >= Height * Tile.Height)
                     OnPlayerKilled(null);
 
-               // UpdateEnemies(gameTime);
+                UpdateEnemies(gameTime);
+                CheckShotsCollision();
 
-               
-                if (player.IsAlive &&
-                    player.IsOnGround &&
-                    player.BoundingRectangle.Contains(exit))
+                if (Player.IsAlive &&
+                    Player.IsOnGround &&
+                    Player.BoundingRectangle.Contains(exit))
                 {
                     OnExitReached();
                 }
             }
 
 
-  
+
+        }
+
+        private void CheckShotsCollision()
+        {
+            
+            foreach (var bullet in Player.Bullets)
+            {
+                foreach (var enemy in enemies)
+                {
+                    if (bullet.BoundingRectangle.Intersects(enemy.BoundingRectangle))
+                    {
+                        enemy.BeeingShot(bullet.Damage, bullet);
+                    }
+                }
+            }
+
+            Player.Bullets.RemoveAll(i => i.IsNotEffective);
+            enemies.RemoveAll(i => i.IsDead);
+        }
+
+        TimeSpan old;
+        private void UpdateEnemies(GameTime gameTime)
+        {
+            old = gameTime.TotalGameTime;
+            foreach (EnemyBase enemy in enemies)
+            {
+                enemy.Update(gameTime);
+
+                if (enemy.BoundingRectangle.Intersects(Player.BoundingRectangle))
+                {
+                    
+                    var timer = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+                    remainingDelay -= timer;
+
+                    if (remainingDelay <= 0)
+                    {
+                        Player.Lives--;
+
+                        remainingDelay = delay;
+                    }
+
+
+
+
+                }
+
+            }
         }
 
         private void OnExitReached()
         {
-            player.OnReachedExit();
+            Player.OnReachedExit();
             reachedExit = true;
         }
         private void OnPlayerKilled(Enemy killedBy)
         {
-           player.OnKilled(killedBy);
+            Player.OnKilled(killedBy);
         }
 
         /// <summary>
@@ -302,36 +356,36 @@ namespace Gamedev.Assets.Levels
 
                 coin.Update(gameTime);
 
-                if (coin.BoundingCircle.Intersects(player.BoundingRectangle))
+                if (coin.BoundingCircle.Intersects(Player.BoundingRectangle))
                 {
                     coins.RemoveAt(i--);
-                    OnCoinCollected(coin, player);
+                    OnCoinCollected(coin, Player);
                 }
             }
         }
 
         private void OnCoinCollected(Coin coin, Player collectedBy)
         {
-            collectedBy.score._Score += coin.GetCoinValue();
+            collectedBy.score.Score += coin.GetCoinValue();
         }
 
 
 
-        public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
+        public void Draw(SpriteBatch spriteBatch)
         {
             // for (int i = 0; i <= EntityLayer; ++i)
             //    spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);
             DrawBackground(spriteBatch);
             DrawTiles(spriteBatch);
-            
+
 
             foreach (Coin coin in coins)
-                coin.Draw(gameTime, spriteBatch);
+                coin.Draw(spriteBatch);
 
-            player.Draw(gameTime, spriteBatch);
+            Player.Draw(spriteBatch);
 
-            foreach (Enemy enemy in enemies)
-                enemy.Draw(gameTime, spriteBatch);
+            foreach (EnemyBase enemy in enemies)
+                enemy.Draw(spriteBatch);
 
             //   for (int i = EntityLayer + 1; i < layers.Length; ++i)
             //  spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);

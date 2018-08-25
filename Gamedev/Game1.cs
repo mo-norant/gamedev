@@ -16,9 +16,11 @@ namespace Gamedev
         private SpriteBatch spriteBatch;
         private Level level1;
         private Camera2D camera;
-        private Score score;
+        private ScoreUI score;
         private HealthUI healthUI;
-
+        private FirePowerUI firePowerUI;
+        private IntroSeq introseq = new IntroSeq();
+        private bool isDebug;
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -26,21 +28,27 @@ namespace Gamedev
             graphics.PreferredBackBufferHeight = 1080;
             graphics.PreferredBackBufferWidth = 1920;
             graphics.GraphicsProfile = GraphicsProfile.HiDef;
-
+            //graphics.ToggleFullScreen();
             
         }
 
         protected override void Initialize()
         {
             base.Initialize();
+
+            introseq.LoadContent(Content);
+
             var viewportAdapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1920, 1080);
             camera = new Camera2D(viewportAdapter);
-            score = new Score(Content, camera);
+            score = new ScoreUI(Content, camera);
             healthUI = new HealthUI(Content, camera);
+            firePowerUI = new FirePowerUI(Content, camera);
             level1 = new Level(Content, GraphicsDevice, 0, score);
+
 
         }
 
+      
 
         protected override void LoadContent()
         {
@@ -58,10 +66,20 @@ namespace Gamedev
                 Exit();
 
             }
+
+            if (introseq.PlayVideo && isDebug)
+            {
+                introseq.Update(gameTime);
+            }
+            else
+            {
+                level1.Update(gameTime);
+                healthUI.Lives = level1.GetPlayer().Lives;
+                healthUI.Update(gameTime);
+                firePowerUI.Update(gameTime);
+            }
             
-            
-            level1.Update(gameTime);
-            healthUI.Update(gameTime, level1.GetPlayer().Lives);
+
             base.Update(gameTime);
         }
 
@@ -71,10 +89,21 @@ namespace Gamedev
             GraphicsDevice.Clear(Color.CornflowerBlue);
             var transformMatrix = camera.GetViewMatrix();
             spriteBatch.Begin(transformMatrix: transformMatrix);
-            FollowPlayer(level1, camera);
-            level1.Draw(gameTime, spriteBatch);
-            score.Draw(gameTime, spriteBatch);
-            healthUI.Draw(gameTime, spriteBatch);
+            if (introseq.PlayVideo && isDebug )
+            {
+                introseq.Draw(spriteBatch);
+            }
+            else
+            {
+                FollowPlayer(level1, camera);
+                level1.Draw(spriteBatch);
+                score.Draw( spriteBatch);
+                healthUI.Draw( spriteBatch);
+                firePowerUI.Draw(spriteBatch);
+            }
+
+
+
             spriteBatch.End();
             base.Draw(gameTime);
         }
